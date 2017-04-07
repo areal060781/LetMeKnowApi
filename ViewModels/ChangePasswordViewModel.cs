@@ -1,7 +1,4 @@
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using LetMeKnowApi.ViewModels.Validations;
 
 namespace LetMeKnowApi.ViewModels 
 {

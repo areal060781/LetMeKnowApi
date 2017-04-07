@@ -1,8 +1,3 @@
-using LetMeKnowApi.ViewModels.Validations;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-
 namespace LetMeKnowApi.ViewModels
 {
     public class UserViewModel
