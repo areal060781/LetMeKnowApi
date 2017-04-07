@@ -199,11 +199,20 @@ namespace LetMeKnowApi.Controllers
 
         // PUT api/users/1
         [HttpPut("{id}")]
-        public IActionResult Put(int id, [FromBody]UserViewModel user)
+        public IActionResult Put(int id, [FromBody]UpdateUserViewModel user)
         {
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
+            }
+            else
+            {
+                /*if (EmailExists(user.Email, id))
+                {
+                    var message = new[] {"El email ha sido tomado por otro usuario"};
+                    var response = new { userName = message };                    
+                    return BadRequest(response);                    
+                }*/
             }
 
             User _userDb = _userRepository.GetSingle(id);
@@ -214,13 +223,13 @@ namespace LetMeKnowApi.Controllers
             }
             else
             {
-                _userDb.UserName = user.UserName;
-                //_userDb.Profession = user.Profession;
-                //_userDb.Avatar = user.Avatar;
+                _userDb.Email = user.Email;                
                 _userRepository.Commit();
             }
 
-            user = Mapper.Map<User, UserViewModel>(_userDb);
+            UserViewModel _userVM = Mapper.Map<User, UserViewModel>(_userDb);            
+            
+            //CreatedAtRouteResult result = CreatedAtRoute("GetUser", new { controller = "Users", id = _userDb.Id }, _userVM);
 
             return new NoContentResult();
         }
@@ -251,7 +260,6 @@ namespace LetMeKnowApi.Controllers
                 }
 
                 _userRepository.Delete(_userDb);
-
                 _userRepository.Commit();
 
                 return new NoContentResult();
