@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using AutoMapper;
 using LetMeKnowApi.Core;
@@ -19,7 +18,7 @@ namespace LetMeKnowApi.Controllers
         private IUserRepository _userRepository;    
         private ISuggestionRepository _suggestionRepository;
         private IUserRoleRepository _userRoleRepository;    
-        private IRoleRepository _roleRepository;
+        private IRoleRepository _roleRepository;        
 
         int page = 1;
         int pageSize = 0;
@@ -31,7 +30,7 @@ namespace LetMeKnowApi.Controllers
             _userRepository = userRepository; 
             _suggestionRepository = suggestionRepository;   
             _userRoleRepository = userRoleRepository;
-            _roleRepository = roleRepository;
+            _roleRepository = roleRepository;            
         }
 
         // GET api/users
@@ -72,6 +71,7 @@ namespace LetMeKnowApi.Controllers
             return new OkObjectResult(_usersVM);
         }
 
+        // GET api/users/1
         [HttpGet("{id}", Name = "GetUser")]
         public IActionResult Get(int id)
         {
@@ -88,6 +88,7 @@ namespace LetMeKnowApi.Controllers
             }
         }
 
+        // GET api/users/1/suggestions
         [HttpGet("{id}/suggestions", Name = "GetUserSuggestions")]
         public IActionResult GetSuggestions(int id)
         {
@@ -104,6 +105,7 @@ namespace LetMeKnowApi.Controllers
             }
         }
 
+        // GET api/users/1/details
         [HttpGet("{id}/details", Name = "GetUserDetails")]
         public IActionResult GetUserDetails(int id)
         {
@@ -126,26 +128,76 @@ namespace LetMeKnowApi.Controllers
             }
         }
 
+           
+        private bool UserNameExists(string userName, int? id)
+        {                  
+            if (id != null){
+                return (_userRepository.GetSingle(u => u.UserName == userName, u => u.Id != id) != null) ? true : false;
+            }
+            else
+            {
+                return (_userRepository.GetSingle(u => u.UserName == userName) != null) ? true : false;
+            }                                  
+        }
+
+        private bool EmailExists(string email, int? id)
+        {        
+            if (id != null){
+                return (_userRepository.GetSingle(u => u.Email == email, u => u.Id != id) != null) ? true : false;
+            }
+            else
+            {
+                return (_userRepository.GetSingle(u => u.Email == email) != null) ? true : false;
+            }                        
+        }
+
+        // POST api/users 
         [HttpPost]
-        public IActionResult Create([FromBody]UserViewModel user)
+        public IActionResult Create([FromBody]RegisterViewModel user)
         {
 
             if (!ModelState.IsValid)
-            {
+            {                            
                 return BadRequest(ModelState);
             }
+            else
+            {
+                if (UserNameExists(user.UserName, null))
+                {
+                    var message = new[] {"El nombre de usuario ya ha sido tomado"};
+                    var response = new { userName = message };                    
+                    return BadRequest(response);                    
+                }
+            }
 
-            User _newUser = new User { UserName = user.UserName };
+            string salt = Extensions.CreateSalt();
+            string password = Extensions.EncryptPassword(user.Password, salt);  
+            int defaultRole = 2;          
+
+            User _newUser = new User 
+            { 
+                UserName = user.UserName, 
+                PasswordHash = password, 
+                Salt = salt, 
+                Email = user.Email
+            };
+
+            _newUser.Roles.Add(new UserRole
+            {
+                User = _newUser,
+                RoleId = defaultRole
+            });
 
             _userRepository.Add(_newUser);
             _userRepository.Commit();
-
-            user = Mapper.Map<User, UserViewModel>(_newUser);
-
-            CreatedAtRouteResult result = CreatedAtRoute("GetUser", new { controller = "Users", id = user.Id }, user);
-            return result;
+            
+            UserViewModel _userVM = Mapper.Map<User, UserViewModel>(_newUser);  
+            
+            CreatedAtRouteResult result = CreatedAtRoute("GetUser", new { controller = "Users", id = _newUser.Id }, _userVM);
+            return result;            
         }
 
+        // PUT api/users/1
         [HttpPut("{id}")]
         public IActionResult Put(int id, [FromBody]UserViewModel user)
         {
@@ -173,6 +225,7 @@ namespace LetMeKnowApi.Controllers
             return new NoContentResult();
         }
 
+        // DELETE api/users/1
         [HttpDelete("{id}")]
         public IActionResult Delete(int id)
         {

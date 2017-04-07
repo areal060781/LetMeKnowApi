@@ -18,7 +18,9 @@ namespace LetMeKnowApi.ViewModels.Mappings
             Mapper.CreateMap<UpdateSuggestionViewModel, Suggestion>()               
                .ForMember(s => s.Area, map => map.UseValue(null));           
 
-            Mapper.CreateMap<UserViewModel, User>();                
+            Mapper.CreateMap<UserViewModel, User>();
+
+            //Mapper.CreateMap<RegisterViewModel, User>();                
 
             Mapper.CreateMap<RoleViewModel, Role>();
 

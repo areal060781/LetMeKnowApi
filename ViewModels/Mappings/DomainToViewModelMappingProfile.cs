@@ -23,6 +23,9 @@ namespace LetMeKnowApi.ViewModels.Mappings
                 .ForMember(vm => vm.Roles, 
                     map => map.UseValue(new List<RoleViewModel>()));
 
+
+            //Mapper.CreateMap<User, RegisterViewModel>();
+
             Mapper.CreateMap<Role, RoleViewModel>()
                 .ForMember(vm => vm.Users,
                     map => map.MapFrom(u => u.Users.Count()));

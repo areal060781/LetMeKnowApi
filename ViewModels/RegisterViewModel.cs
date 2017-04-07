@@ -1,30 +1,31 @@
-using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using System.Threading.Tasks;
+using LetMeKnowApi.ViewModels.Validations;
 
 namespace LetMeKnowApi.ViewModels 
 {
-    public class RegisterViewModel //: IValidatableObject
+    public class RegisterViewModel : IValidatableObject
     {
-        //[Required]
-        //public string Username { get; set; }
+        [Required(ErrorMessage = "El nombre de usuario es requerido")]         
+        public string UserName { get; set; }             
 
-        [Required]
-        //[EmailAddress]
-        //[Display(Name = "Email")]
+        [Required(ErrorMessage = "El correo electrónico es requerido")]
+        [EmailAddress(ErrorMessage = "El correo no es una dirección de email válida")]        
         public string Email { get; set; }
 
-        [Required]
-        //[StringLength(100, ErrorMessage = "The {0} must be at least {2} characters long.", MinimumLength = 6)]
-        //[DataType(DataType.Password)]
-        //[Display(Name = "Password")]
+        [Required(ErrorMessage = "La contraseña es requerida")]
+        [StringLength(100, ErrorMessage = "La {0} debe tener al menos {2} y como máximo {1} caracteres de longitud.", MinimumLength = 6)]
+        [Display(Name = "Contraseña")]   
         public string Password { get; set; }
-
-        //[DataType(DataType.Password)]
-        //[Display(Name = "Confirm password")]
-        //[Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
-        //public string ConfirmPassword { get; set; }
+        
+        [Compare("Password", ErrorMessage = "La contraseña y la confirmación de la contraseña no coinciden.")]
+        public string ConfirmPassword { get; set; }
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            var validator = new RegisterViewModelValidator();
+            var result = validator.Validate(this);
+            return result.Errors.Select(item => new ValidationResult(item.ErrorMessage, new[] { item.PropertyName }));
+        }
     }
 }
