@@ -19,16 +19,19 @@ namespace LetMeKnowApi.Controllers
         private IUserRepository _userRepository;    
         private ISuggestionRepository _suggestionRepository;
         private IUserRoleRepository _userRoleRepository;    
+        private IRoleRepository _roleRepository;
 
         int page = 1;
         int pageSize = 0;
         public UsersController(IUserRepository userRepository,
                                 ISuggestionRepository suggestionRepository,
-                                IUserRoleRepository userRoleRepository)
+                                IUserRoleRepository userRoleRepository,
+                                IRoleRepository roleRepository)
         {
             _userRepository = userRepository; 
             _suggestionRepository = suggestionRepository;   
             _userRoleRepository = userRoleRepository;
+            _roleRepository = roleRepository;
         }
 
         // GET api/users
@@ -101,21 +104,27 @@ namespace LetMeKnowApi.Controllers
             }
         }
 
-        /*[HttpGet("{id}/roles", Name = "GetUserRoles")]
-        public IActionResult GetRoles(int id)
+        [HttpGet("{id}/details", Name = "GetUserDetails")]
+        public IActionResult GetUserDetails(int id)
         {
-            IEnumerable<Schedule> _userSchedules = _scheduleRepository.FindBy(s => s.CreatorId == id);
+            User _user = _userRepository.GetSingle(u => u.Id == id, u => u.SuggestionsCreated, u => u.Roles);
 
-            if (_userSchedules != null)
+            if(_user != null)
             {
-                IEnumerable<ScheduleViewModel> _userSchedulesVM = Mapper.Map<IEnumerable<Schedule>, IEnumerable<ScheduleViewModel>>(_userSchedules);
-                return new OkObjectResult(_userSchedulesVM);
+                UserDetailsViewModel _userDetailsVM = Mapper.Map<User, UserDetailsViewModel>(_user);
+                
+                foreach(var role in _user.Roles)
+                {
+                    Role _roleDb = _roleRepository.GetSingle(r => r.Id == role.RoleId, r => r.Users);
+                    _userDetailsVM.Roles.Add(Mapper.Map<Role, RoleViewModel>(_roleDb));
+                }
+                return new OkObjectResult(_userDetailsVM);
             }
             else
             {
                 return NotFound();
             }
-        }*/
+        }
 
         [HttpPost]
         public IActionResult Create([FromBody]UserViewModel user)

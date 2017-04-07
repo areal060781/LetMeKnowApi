@@ -85,12 +85,29 @@ namespace LetMeKnowApi.Controllers
 
         }
 
-        // GET api/roles/5/users
-        /*[HttpGet("{id}/users", Name="GetRoleUsers")]
-        public IActionResult GetUsers(int id)
+        // GET api/roles/5/details
+        [HttpGet("{id}/details", Name="GetRoleDetails")]
+        public IActionResult GetRoleDetails(int id)
         {
+            Role _role = _roleRepository.GetSingle(r => r.Id == id, r => r.Users);
+
+            if (_role != null){
+                RoleDetailsViewModel _roleDetailsVM = Mapper.Map<Role, RoleDetailsViewModel>(_role);
+
+                foreach (var user in _role.Users)
+                {
+                    User _userDb = _userRepository.GetSingle(user.UserId);            
+                    _roleDetailsVM.Users.Add(Mapper.Map<User, UserViewModel>(_userDb));
+                }
+                return new OkObjectResult(_roleDetailsVM);
+
+            }
+            else
+            {
+                return NotFound();
+            }
             
-        }*/
+        }
 
         // POST api/roles
         [HttpPost]
