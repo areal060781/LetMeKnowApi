@@ -24,7 +24,7 @@ namespace LetMeKnowApi.Data.Repositories
         public virtual IEnumerable<T> GetAll()
         {
             return _context.Set<T>().AsEnumerable();
-        }
+        }        
 
         public virtual int Count()
         {
@@ -38,7 +38,7 @@ namespace LetMeKnowApi.Data.Repositories
                 query = query.Include(includeProperty);
             }
             return query.AsEnumerable();
-        }
+        }         
 
         public T GetSingle(int id)
         {

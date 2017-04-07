@@ -146,7 +146,7 @@ namespace LetMeKnowApi.Controllers
                 return (_userRepository.GetSingle(u => u.Email == email, u => u.Id != id) != null) ? true : false;
             }
             else
-            {
+            {                
                 return (_userRepository.GetSingle(u => u.Email == email) != null) ? true : false;
             }                        
         }
@@ -225,6 +225,45 @@ namespace LetMeKnowApi.Controllers
             {
                 _userDb.Email = user.Email;                
                 _userRepository.Commit();
+            }
+
+            UserViewModel _userVM = Mapper.Map<User, UserViewModel>(_userDb);            
+            
+            //CreatedAtRouteResult result = CreatedAtRoute("GetUser", new { controller = "Users", id = _userDb.Id }, _userVM);
+
+            return new NoContentResult();
+        }
+
+        // PUT api/users/1
+        [HttpPut("{id}/changePassword", Name = "ChangePassword")]
+        public IActionResult ChangePassword(int id, [FromBody]ChangePasswordViewModel user)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }                      
+
+            User _userDb = _userRepository.GetSingle(id);
+
+            if (_userDb == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                //Verificar que la contraseña anterior y la de la bd existan.
+                string oldPasswordHashed = Extensions.EncryptPassword(user.OldPassword, _userDb.Salt);
+                if (_userDb.PasswordHash != oldPasswordHashed){
+                    var message = new[] {"La antigua contraseña no coincide"};
+                    var response = new { oldPassWord = message };                    
+                    return BadRequest(response);                     
+                }else{
+                    string salt = Extensions.CreateSalt();
+                    string newPasswordHashed = Extensions.EncryptPassword(user.NewPassword, salt);
+                    _userDb.Salt = salt;
+                    _userDb.PasswordHash= newPasswordHashed;            
+                    _userRepository.Commit();
+                }                
             }
 
             UserViewModel _userVM = Mapper.Map<User, UserViewModel>(_userDb);            
