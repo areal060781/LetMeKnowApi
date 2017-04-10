@@ -7,12 +7,12 @@ using LetMeKnowApi.Data.Abstract;
 using LetMeKnowApi.Model;
 using LetMeKnowApi.ViewModels;
 using LetMeKnowApi.Core;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+using Microsoft.AspNetCore.Authorization;
 
 namespace LetMeKnowApi.Controllers
 {
     [Route("api/[controller]")]
+    [AllowAnonymous]
     public class SuggestionsController : Controller
     {
         private ISuggestionRepository _suggestionRepository;
@@ -68,15 +68,13 @@ namespace LetMeKnowApi.Controllers
             Suggestion _suggestion = _suggestionRepository
                 .GetSingle(s => s.Id == id, s => s.Creator, s => s.Area);
 
-            if (_suggestion != null)
-            {
-                SuggestionViewModel _suggestionVM = Mapper.Map<Suggestion, SuggestionViewModel>(_suggestion);
-                return new OkObjectResult(_suggestionVM);
-            }
-            else
-            {
+            if (_suggestion == null)
+            {                        
                 return NotFound();
             }
+            SuggestionViewModel _suggestionVM = Mapper.Map<Suggestion, SuggestionViewModel>(_suggestion);
+
+            return new OkObjectResult(_suggestionVM);
         }
 
         // POST api/suggestions
@@ -107,30 +105,29 @@ namespace LetMeKnowApi.Controllers
         [HttpPut("{id}")]
         public IActionResult Put(int id, [FromBody]UpdateSuggestionViewModel suggestion)
         {
-            if(!ModelState.IsValid)
+            if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
             }
 
             Suggestion _suggestionDB = _suggestionRepository.GetSingle(id);
 
-            if(_suggestionDB == null)
+            if (_suggestionDB == null)
             {
                 return NotFound();
             }
-            else{
-                _suggestionDB.Title = suggestion.Title;
-                _suggestionDB.Content = suggestion.Content;
-                _suggestionDB.Image = suggestion.Image;
-                _suggestionDB.AreaId = suggestion.AreaId;
-                _suggestionDB.DateUpdated = DateTime.Now;
+            
+            _suggestionDB.Title = suggestion.Title;
+            _suggestionDB.Content = suggestion.Content;
+            _suggestionDB.Image = suggestion.Image;
+            _suggestionDB.AreaId = suggestion.AreaId;
+            _suggestionDB.DateUpdated = DateTime.Now;
 
-                //Only if user is admin:                
-                //_suggestionDB.Status = (SuggestionStatus)Enum.Parse(typeof(SuggestionStatus), suggestion.Status);
+            //Only if user is admin:                
+            //_suggestionDB.Status = (SuggestionStatus)Enum.Parse(typeof(SuggestionStatus), suggestion.Status);
 
-                _suggestionRepository.Commit();
-            }
-
+             _suggestionRepository.Commit();
+            
             suggestion = Mapper.Map<Suggestion, UpdateSuggestionViewModel>(_suggestionDB);
 
             return new NoContentResult();
@@ -146,14 +143,11 @@ namespace LetMeKnowApi.Controllers
             {
                 return new NotFoundResult();
             }
-            else
-            {
-                _suggestionRepository.Delete(_suggestionDB);
-                _suggestionRepository.Commit();
-                return new NoContentResult();
+            
+             _suggestionRepository.Delete(_suggestionDB);
+            _suggestionRepository.Commit();
 
-            }
-
+            return new NoContentResult();
         }
     }
 }

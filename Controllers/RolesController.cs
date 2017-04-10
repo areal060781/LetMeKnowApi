@@ -6,13 +6,13 @@ using LetMeKnowApi.Core;
 using LetMeKnowApi.Data.Abstract;
 using LetMeKnowApi.Model;
 using LetMeKnowApi.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace LetMeKnowApi.Controllers
 {
     [Route("api/[controller]")]
+    [AllowAnonymous]
     public class RolesController : Controller
     {
         public IRoleRepository _roleRepository;        
@@ -73,16 +73,14 @@ namespace LetMeKnowApi.Controllers
         {
             Role _role = _roleRepository.GetSingle(a => a.Id == id, a => a.Users);
 
-            if (_role != null)
-            {
-                RoleViewModel _roleVM = Mapper.Map<Role, RoleViewModel>(_role);
-                return new OkObjectResult(_roleVM);
-            }
-            else
+            if (_role == null)            
             {
                 return NotFound();
             }
 
+            RoleViewModel _roleVM = Mapper.Map<Role, RoleViewModel>(_role);
+
+            return new OkObjectResult(_roleVM);
         }
 
         // GET api/roles/5/details
@@ -91,22 +89,19 @@ namespace LetMeKnowApi.Controllers
         {
             Role _role = _roleRepository.GetSingle(r => r.Id == id, r => r.Users);
 
-            if (_role != null){
-                RoleDetailsViewModel _roleDetailsVM = Mapper.Map<Role, RoleDetailsViewModel>(_role);
-
-                foreach (var user in _role.Users)
-                {
-                    User _userDb = _userRepository.GetSingle(user.UserId);            
-                    _roleDetailsVM.Users.Add(Mapper.Map<User, UserViewModel>(_userDb));
-                }
-                return new OkObjectResult(_roleDetailsVM);
-
-            }
-            else
+            if (_role == null)
             {
                 return NotFound();
             }
-            
+
+            RoleDetailsViewModel _roleDetailsVM = Mapper.Map<Role, RoleDetailsViewModel>(_role);
+            foreach (var user in _role.Users)
+            {
+                User _userDb = _userRepository.GetSingle(user.UserId);            
+                _roleDetailsVM.Users.Add(Mapper.Map<User, UserViewModel>(_userDb));
+            }
+
+            return new OkObjectResult(_roleDetailsVM);            
         }
 
         // POST api/roles
@@ -143,12 +138,9 @@ namespace LetMeKnowApi.Controllers
             {
                 return NotFound();
             }
-            else
-            {
-                _roleDb.Name = role.Name;
-                _roleRepository.Commit();
-            }
-
+            
+            _roleDb.Name = role.Name;
+            _roleRepository.Commit();            
             role = Mapper.Map<Role, RoleViewModel>(_roleDb);
 
             return new NoContentResult();
@@ -164,26 +156,23 @@ namespace LetMeKnowApi.Controllers
             {
                 return new NotFoundResult();
             }
-            else
+            
+            IEnumerable<UserRole> _userRoles = _userRoleRepository.FindBy(s => s.RoleId == id);
+            foreach(var userRole in _userRoles)
             {
-                IEnumerable<UserRole> _userRoles = _userRoleRepository.FindBy(s => s.RoleId == id);
-                foreach(var userRole in _userRoles)
+                IEnumerable<Suggestion> _suggestions = _suggestionRepository.FindBy(s => s.CreatorId == userRole.UserId);
+                foreach(var suggestion in _suggestions)
                 {
-                    IEnumerable<Suggestion> _suggestions = _suggestionRepository.FindBy(s => s.CreatorId == userRole.UserId);
-                    foreach(var suggestion in _suggestions)
-                    {
-                        _suggestionRepository.Delete(suggestion);
-                    }
-                    _userRepository.DeleteWhere(u => u.Id == userRole.UserId);
-                    _userRoleRepository.Delete(userRole);
-                }                   
+                    _suggestionRepository.Delete(suggestion);
+                }
+                _userRepository.DeleteWhere(u => u.Id == userRole.UserId);
+                _userRoleRepository.Delete(userRole);
+            }                   
 
-                _roleRepository.Delete(_roleDb);
-                _roleRepository.Commit();
+            _roleRepository.Delete(_roleDb);
+            _roleRepository.Commit();
 
-                return new NoContentResult();            
-
-            }
+            return new NoContentResult(); 
         }
     }
 }    

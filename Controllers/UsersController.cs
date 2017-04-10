@@ -7,12 +7,12 @@ using LetMeKnowApi.Core;
 using LetMeKnowApi.Data.Abstract;
 using LetMeKnowApi.Model;
 using LetMeKnowApi.ViewModels;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+using Microsoft.AspNetCore.Authorization;
 
 namespace LetMeKnowApi.Controllers
 {
     [Route("api/[controller]")]
+    [AllowAnonymous]
     public class UsersController : Controller
     {
         private IUserRepository _userRepository;    
@@ -34,7 +34,7 @@ namespace LetMeKnowApi.Controllers
         }
 
         // GET api/users
-        [HttpGet]
+        [HttpGet]        
         public IActionResult Get()
         {
             var pagination = Request.Headers["Pagination"];
@@ -77,15 +77,13 @@ namespace LetMeKnowApi.Controllers
         {
             User _user = _userRepository.GetSingle(u => u.Id == id, u => u.SuggestionsCreated);
 
-            if (_user != null)
-            {
-                UserViewModel _userVM = Mapper.Map<User, UserViewModel>(_user);
-                return new OkObjectResult(_userVM);
-            }
-            else
+            if (_user == null)
             {
                 return NotFound();
             }
+            
+            UserViewModel _userVM = Mapper.Map<User, UserViewModel>(_user);
+            return new OkObjectResult(_userVM);
         }
 
         // GET api/users/1/suggestions
@@ -94,15 +92,13 @@ namespace LetMeKnowApi.Controllers
         {
             IEnumerable<Suggestion> _userSuggestions = _suggestionRepository.FindBy(s => s.CreatorId == id);
 
-            if (_userSuggestions != null)
-            {
-                IEnumerable<SuggestionViewModel> _userSuggestionsVM = Mapper.Map<IEnumerable<Suggestion>, IEnumerable<SuggestionViewModel>>(_userSuggestions);
-                return new OkObjectResult(_userSuggestionsVM);
-            }
-            else
+            if (_userSuggestions == null)
             {
                 return NotFound();
-            }
+            }            
+
+            IEnumerable<SuggestionViewModel> _userSuggestionsVM = Mapper.Map<IEnumerable<Suggestion>, IEnumerable<SuggestionViewModel>>(_userSuggestions);
+            return new OkObjectResult(_userSuggestionsVM);
         }
 
         // GET api/users/1/details
@@ -111,23 +107,20 @@ namespace LetMeKnowApi.Controllers
         {
             User _user = _userRepository.GetSingle(u => u.Id == id, u => u.SuggestionsCreated, u => u.Roles);
 
-            if(_user != null)
-            {
-                UserDetailsViewModel _userDetailsVM = Mapper.Map<User, UserDetailsViewModel>(_user);
-                
-                foreach(var role in _user.Roles)
-                {
-                    Role _roleDb = _roleRepository.GetSingle(r => r.Id == role.RoleId, r => r.Users);
-                    _userDetailsVM.Roles.Add(Mapper.Map<Role, RoleViewModel>(_roleDb));
-                }
-                return new OkObjectResult(_userDetailsVM);
-            }
-            else
+            if(_user == null)
             {
                 return NotFound();
-            }
-        }
+            }            
 
+            UserDetailsViewModel _userDetailsVM = Mapper.Map<User, UserDetailsViewModel>(_user);                
+            foreach(var role in _user.Roles)
+            {
+                Role _roleDb = _roleRepository.GetSingle(r => r.Id == role.RoleId, r => r.Users);
+                _userDetailsVM.Roles.Add(Mapper.Map<Role, RoleViewModel>(_roleDb));
+            }
+
+            return new OkObjectResult(_userDetailsVM);
+        }
            
         private bool UserNameExists(string userName, int? id)
         {                  
@@ -160,14 +153,12 @@ namespace LetMeKnowApi.Controllers
             {                            
                 return BadRequest(ModelState);
             }
-            else
+            
+            if (UserNameExists(user.UserName, null))
             {
-                if (UserNameExists(user.UserName, null))
-                {
-                    var message = new[] {"El nombre de usuario ya ha sido tomado"};
-                    var response = new { userName = message };                    
-                    return BadRequest(response);                    
-                }
+                var message = new[] {"El nombre de usuario ya ha sido tomado"};
+                var response = new { userName = message };                    
+                return BadRequest(response);                    
             }
 
             string salt = Extensions.CreateSalt();
@@ -205,15 +196,13 @@ namespace LetMeKnowApi.Controllers
             {
                 return BadRequest(ModelState);
             }
-            else
+            
+            /*if (EmailExists(user.Email, id))
             {
-                /*if (EmailExists(user.Email, id))
-                {
-                    var message = new[] {"El email ha sido tomado por otro usuario"};
-                    var response = new { userName = message };                    
-                    return BadRequest(response);                    
-                }*/
-            }
+                var message = new[] {"El email ha sido tomado por otro usuario"};
+                var response = new { userName = message };                    
+                return BadRequest(response);                    
+            }*/
 
             User _userDb = _userRepository.GetSingle(id);
 
@@ -221,11 +210,9 @@ namespace LetMeKnowApi.Controllers
             {
                 return NotFound();
             }
-            else
-            {
-                _userDb.Email = user.Email;                
-                _userRepository.Commit();
-            }
+            
+            _userDb.Email = user.Email;                
+            _userRepository.Commit();
 
             UserViewModel _userVM = Mapper.Map<User, UserViewModel>(_userDb);            
             
@@ -249,22 +236,20 @@ namespace LetMeKnowApi.Controllers
             {
                 return NotFound();
             }
-            else
-            {
-                //Verificar que la contraseña anterior y la de la bd existan.
-                string oldPasswordHashed = Extensions.EncryptPassword(user.OldPassword, _userDb.Salt);
-                if (_userDb.PasswordHash != oldPasswordHashed){
-                    var message = new[] {"La antigua contraseña no coincide"};
-                    var response = new { oldPassWord = message };                    
-                    return BadRequest(response);                     
-                }else{
-                    string salt = Extensions.CreateSalt();
-                    string newPasswordHashed = Extensions.EncryptPassword(user.NewPassword, salt);
-                    _userDb.Salt = salt;
-                    _userDb.PasswordHash= newPasswordHashed;            
-                    _userRepository.Commit();
-                }                
+            
+            //Verificar que la contraseña anterior y la de la bd existan.
+            string oldPasswordHashed = Extensions.EncryptPassword(user.OldPassword, _userDb.Salt);
+            if (_userDb.PasswordHash != oldPasswordHashed){
+                var message = new[] {"La antigua contraseña no coincide"};
+                var response = new { oldPassWord = message };                    
+                return BadRequest(response);                     
             }
+
+            string salt = Extensions.CreateSalt();
+            string newPasswordHashed = Extensions.EncryptPassword(user.NewPassword, salt);
+            _userDb.Salt = salt;
+            _userDb.PasswordHash= newPasswordHashed;            
+            _userRepository.Commit();                       
 
             UserViewModel _userVM = Mapper.Map<User, UserViewModel>(_userDb);            
             
@@ -283,28 +268,24 @@ namespace LetMeKnowApi.Controllers
             {
                 return new NotFoundResult();
             }
-            else
+            
+            IEnumerable<Suggestion> _suggestions = _suggestionRepository.FindBy(a => a.CreatorId == id);
+            IEnumerable<UserRole> _userRoles = _userRoleRepository.FindBy(s => s.UserId == id);
+
+            foreach (var suggestion in _suggestions)
             {
-                IEnumerable<Suggestion> _suggestions = _suggestionRepository.FindBy(a => a.CreatorId == id);
-                IEnumerable<UserRole> _userRoles = _userRoleRepository.FindBy(s => s.UserId == id);
-
-                foreach (var suggestion in _suggestions)
-                {
-                    _suggestionRepository.Delete(suggestion);
-                }
-
-                foreach (var userRole in _userRoles)
-                {                    
-                    _userRoleRepository.Delete(userRole);
-                }
-
-                _userRepository.Delete(_userDb);
-                _userRepository.Commit();
-
-                return new NoContentResult();
+                 _suggestionRepository.Delete(suggestion);
             }
-        }
 
-    }
-    
+            foreach (var userRole in _userRoles)
+            {                    
+                _userRoleRepository.Delete(userRole);
+            }
+
+            _userRepository.Delete(_userDb);
+            _userRepository.Commit();
+
+            return new NoContentResult();
+        }
+    }   
 }

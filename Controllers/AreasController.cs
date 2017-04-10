@@ -6,13 +6,13 @@ using LetMeKnowApi.Core;
 using LetMeKnowApi.Data.Abstract;
 using LetMeKnowApi.Model;
 using LetMeKnowApi.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace LetMeKnowApi.Controllers
 {
     [Route("api/[controller]")]
+    [AllowAnonymous]
     public class AreasController : Controller
     {
         public IAreaRepository _areaRepository;
@@ -36,9 +36,7 @@ namespace LetMeKnowApi.Controllers
                 string[] vals = pagination.ToString().Split(',');
                 int.TryParse(vals[0], out page);
                 int.TryParse(vals[1], out pageSize);
-            }  
-
-                     
+            }             
 
             int currentPage = page;
             int currentPageSize = pageSize;
@@ -72,16 +70,13 @@ namespace LetMeKnowApi.Controllers
         {
             Area _area = _areaRepository.GetSingle(a => a.Id == id, a => a.Suggestions);
 
-            if (_area != null)
-            {
-                AreaViewModel _areaVM = Mapper.Map<Area, AreaViewModel>(_area);
-                return new OkObjectResult(_areaVM);
-            }
-            else
+            if (_area == null)
             {
                 return NotFound();
             }
-
+            
+            AreaViewModel _areaVM = Mapper.Map<Area, AreaViewModel>(_area);
+            return new OkObjectResult(_areaVM);
         }
 
         // GET api/areas/5/suggestions
@@ -90,14 +85,13 @@ namespace LetMeKnowApi.Controllers
         {
             IEnumerable<Suggestion> _areaSuggestions = _suggestionRepository.FindBy(s => s.AreaId == id);
 
-            if (_areaSuggestions != null)
+            if (_areaSuggestions == null)
             {
-                IEnumerable<SuggestionViewModel> _areaSuggestionsVM = Mapper.Map<IEnumerable<Suggestion>, IEnumerable<SuggestionViewModel>>(_areaSuggestions);
-                return new OkObjectResult(_areaSuggestionsVM);
-            }
-            else{
                 return NotFound();
             }
+            
+            IEnumerable<SuggestionViewModel> _areaSuggestionsVM = Mapper.Map<IEnumerable<Suggestion>, IEnumerable<SuggestionViewModel>>(_areaSuggestions);
+            return new OkObjectResult(_areaSuggestionsVM);
         }
 
         // POST api/areas
@@ -134,12 +128,9 @@ namespace LetMeKnowApi.Controllers
             {
                 return NotFound();
             }
-            else
-            {
-                _areaDb.Name = area.Name;
-                _areaRepository.Commit();
-            }
-
+            
+            _areaDb.Name = area.Name;
+            _areaRepository.Commit();
             area = Mapper.Map<Area, AreaViewModel>(_areaDb);
 
             return new NoContentResult();
@@ -154,22 +145,18 @@ namespace LetMeKnowApi.Controllers
             if(_areaDb == null)
             {
                 return new NotFoundResult();
-            }
-            else
+            }            
+
+            IEnumerable<Suggestion> _suggestions = _suggestionRepository.FindBy(s => s.AreaId == id);
+            foreach(var suggestion in _suggestions)
             {
-                IEnumerable<Suggestion> _suggestions = _suggestionRepository.FindBy(s => s.AreaId == id);
+                _suggestionRepository.Delete(suggestion);
+            }    
 
-                foreach(var suggestion in _suggestions)
-                {
-                    _suggestionRepository.Delete(suggestion);
-                }    
+             _areaRepository.Delete(_areaDb);
+             _areaRepository.Commit();
 
-                _areaRepository.Delete(_areaDb);
-                _areaRepository.Commit();
-
-                return new NoContentResult();            
-
-            }
+            return new NoContentResult();    
         }
     }
 }    
