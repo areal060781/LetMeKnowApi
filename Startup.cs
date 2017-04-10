@@ -1,17 +1,18 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
+using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Serialization;
+using Microsoft.IdentityModel.Tokens;
+using LetMeKnowApi.Options;
 using LetMeKnowApi.Data;
 using LetMeKnowApi.Data.Abstract;
 using LetMeKnowApi.Data.Repositories;
@@ -20,21 +21,16 @@ using LetMeKnowApi.Core;
 
 namespace LetMeKnowApi
 {
-    public class Startup
+    public partial class Startup
     {
         private static string _applicationPath = string.Empty;
         string sqlConnectionString = string.Empty;
         bool useInMemoryProvider = false;
         public IConfigurationRoot Configuration { get; }
+        private const string SecretKey = "needtogetthisfromenvironment";
+        private readonly SymmetricSecurityKey _signingKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(SecretKey));
         public Startup(IHostingEnvironment env)
-        {
-            /*var builder = new ConfigurationBuilder()
-                .SetBasePath(env.ContentRootPath)
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
-                .AddEnvironmentVariables();
-            Configuration = builder.Build();*/
-
+        {        
             _applicationPath = env.WebRootPath;
             // Setup configuration sources.
 
@@ -56,10 +52,7 @@ namespace LetMeKnowApi
 
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
-        {
-            services.AddDbContext<LetMeKnowContext>(options =>
-                        options.UseSqlite(Configuration.GetConnectionString("DefaultConnection")));
-
+        {        
             string sqlConnectionString = Configuration.GetConnectionString("DefaultConnection");
 
             try
@@ -91,21 +84,50 @@ namespace LetMeKnowApi
             // Automapper Configuration
             AutoMapperConfiguration.Configure();
 
+            /*jwt*/services.AddOptions(); 
+
             // Enable Cors
             services.AddCors();
 
             // Add MVC services to the services container.
-            services.AddMvc()
-                .AddJsonOptions(opts =>
-                {
+            services.AddMvc(config => {
+                    var policy = new AuthorizationPolicyBuilder()
+                                    .RequireAuthenticatedUser()
+                                    .Build();
+                    config.Filters.Add(new AuthorizeFilter(policy));
+                })
+                .AddJsonOptions(opts => {
                     // Force Camel Case to JSON
                     opts.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
                 });
+
+            // Use policy auth.
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("DisneyUser",
+                                policy => policy.RequireClaim("DisneyCharacter", "IAmMickey"));
+            });
+
+            // Get options from app settings
+            var jwtAppSettingOptions = Configuration.GetSection(nameof(JwtIssuerOptions));
+
+            // Configure JwtIssuerOptions
+            services.Configure<JwtIssuerOptions>(options =>
+            {
+                options.Issuer = jwtAppSettingOptions[nameof(JwtIssuerOptions.Issuer)];
+                options.Audience = jwtAppSettingOptions[nameof(JwtIssuerOptions.Audience)];
+                options.SigningCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.HmacSha256);
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
-        {        
+        {   
+            //loggerFactory.AddConsole(LogLevel.Debug);
+            //loggerFactory.AddDebug();
+
+            ConfigureAuth(app);     
+
             app.UseStaticFiles();
             
             // Cors services
