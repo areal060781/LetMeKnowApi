@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Authorization;
 namespace LetMeKnowApi.Controllers
 {
     [Route("api/[controller]")]
-    [AllowAnonymous]
+    //[AllowAnonymous]
     public class SuggestionsController : Controller
     {
         private ISuggestionRepository _suggestionRepository;
@@ -24,6 +24,7 @@ namespace LetMeKnowApi.Controllers
         }
         // GET api/suggestions
         [HttpGet]
+        [Authorize(Roles = "Administrator,Sender")]
         public IActionResult Get()
         {
             var pagination = Request.Headers["Pagination"];
@@ -63,6 +64,7 @@ namespace LetMeKnowApi.Controllers
 
         // GET api/suggestions/5
         [HttpGet("{id}", Name = "GetSuggestion")]
+        [Authorize(Roles = "Administrator,Sender")]
         public IActionResult Get(int id)
         {
             Suggestion _suggestion = _suggestionRepository
@@ -79,6 +81,7 @@ namespace LetMeKnowApi.Controllers
 
         // POST api/suggestions
         [HttpPost]
+        [Authorize(Roles = "Administrator,Sender")]
         public IActionResult Create([FromBody]SuggestionViewModel suggestion)        
         {
             if(!ModelState.IsValid)
@@ -103,6 +106,7 @@ namespace LetMeKnowApi.Controllers
 
         // PUT api/suggestions/5
         [HttpPut("{id}")]
+        [Authorize(Roles = "Administrator,Sender")]
         public IActionResult Put(int id, [FromBody]UpdateSuggestionViewModel suggestion)
         {
             if (!ModelState.IsValid)
@@ -135,6 +139,7 @@ namespace LetMeKnowApi.Controllers
 
         // DELETE api/suggestions/5
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Administrator")]
         public IActionResult Delete(int id)
         {
             Suggestion _suggestionDB = _suggestionRepository.GetSingle(id);

@@ -12,7 +12,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace LetMeKnowApi.Controllers
 {
     [Route("api/[controller]")]
-    [AllowAnonymous]
+    //[AllowAnonymous]
+    [Authorize(Roles = "Administrator")]
     public class RolesController : Controller
     {
         public IRoleRepository _roleRepository;        

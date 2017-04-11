@@ -12,7 +12,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace LetMeKnowApi.Controllers
 {
     [Route("api/[controller]")]
-    [AllowAnonymous]
+    //[AllowAnonymous]
+    [Authorize(Roles = "Administrator")]
     public class AreasController : Controller
     {
         public IAreaRepository _areaRepository;

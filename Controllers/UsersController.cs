@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Authorization;
 namespace LetMeKnowApi.Controllers
 {
     [Route("api/[controller]")]
-    [AllowAnonymous]
+    //[AllowAnonymous]
     public class UsersController : Controller
     {
         private IUserRepository _userRepository;    
@@ -34,7 +34,8 @@ namespace LetMeKnowApi.Controllers
         }
 
         // GET api/users
-        [HttpGet]        
+        [HttpGet]   
+        [Authorize(Roles = "Administrator")]     
         public IActionResult Get()
         {
             var pagination = Request.Headers["Pagination"];
@@ -73,6 +74,7 @@ namespace LetMeKnowApi.Controllers
 
         // GET api/users/1
         [HttpGet("{id}", Name = "GetUser")]
+        [Authorize(Roles = "Administrator")]
         public IActionResult Get(int id)
         {
             User _user = _userRepository.GetSingle(u => u.Id == id, u => u.SuggestionsCreated);
@@ -88,6 +90,7 @@ namespace LetMeKnowApi.Controllers
 
         // GET api/users/1/suggestions
         [HttpGet("{id}/suggestions", Name = "GetUserSuggestions")]
+        [Authorize(Roles = "Administrator,Sender")]
         public IActionResult GetSuggestions(int id)
         {
             IEnumerable<Suggestion> _userSuggestions = _suggestionRepository.FindBy(s => s.CreatorId == id);
@@ -103,6 +106,7 @@ namespace LetMeKnowApi.Controllers
 
         // GET api/users/1/details
         [HttpGet("{id}/details", Name = "GetUserDetails")]
+        [Authorize(Roles = "Administrator")]
         public IActionResult GetUserDetails(int id)
         {
             User _user = _userRepository.GetSingle(u => u.Id == id, u => u.SuggestionsCreated, u => u.Roles);
@@ -120,18 +124,7 @@ namespace LetMeKnowApi.Controllers
             }
 
             return new OkObjectResult(_userDetailsVM);
-        }
-           
-        private bool UserNameExists(string userName, int? id)
-        {                  
-            if (id != null){
-                return (_userRepository.GetSingle(u => u.UserName == userName, u => u.Id != id) != null) ? true : false;
-            }
-            else
-            {
-                return (_userRepository.GetSingle(u => u.UserName == userName) != null) ? true : false;
-            }                                  
-        }
+        }    
 
         private bool EmailExists(string email, int? id)
         {        
@@ -142,54 +135,11 @@ namespace LetMeKnowApi.Controllers
             {                
                 return (_userRepository.GetSingle(u => u.Email == email) != null) ? true : false;
             }                        
-        }
-
-        // POST api/users 
-        [HttpPost]
-        public IActionResult Create([FromBody]RegisterViewModel user)
-        {
-
-            if (!ModelState.IsValid)
-            {                            
-                return BadRequest(ModelState);
-            }
-            
-            if (UserNameExists(user.UserName, null))
-            {
-                var message = new[] {"El nombre de usuario ya ha sido tomado"};
-                var response = new { userName = message };                    
-                return BadRequest(response);                    
-            }
-
-            string salt = Extensions.CreateSalt();
-            string password = Extensions.EncryptPassword(user.Password, salt);  
-            int defaultRole = 2;          
-
-            User _newUser = new User 
-            { 
-                UserName = user.UserName, 
-                PasswordHash = password, 
-                Salt = salt, 
-                Email = user.Email
-            };
-
-            _newUser.Roles.Add(new UserRole
-            {
-                User = _newUser,
-                RoleId = defaultRole
-            });
-
-            _userRepository.Add(_newUser);
-            _userRepository.Commit();
-            
-            UserViewModel _userVM = Mapper.Map<User, UserViewModel>(_newUser);  
-            
-            CreatedAtRouteResult result = CreatedAtRoute("GetUser", new { controller = "Users", id = _newUser.Id }, _userVM);
-            return result;            
-        }
+        }    
 
         // PUT api/users/1
         [HttpPut("{id}")]
+        [Authorize(Roles = "Administrator")]
         public IActionResult Put(int id, [FromBody]UpdateUserViewModel user)
         {
             if (!ModelState.IsValid)
@@ -223,6 +173,7 @@ namespace LetMeKnowApi.Controllers
 
         // PUT api/users/1
         [HttpPut("{id}/changePassword", Name = "ChangePassword")]
+        [Authorize(Roles = "Administrator,Sender")]
         public IActionResult ChangePassword(int id, [FromBody]ChangePasswordViewModel user)
         {
             if (!ModelState.IsValid)
@@ -260,6 +211,7 @@ namespace LetMeKnowApi.Controllers
 
         // DELETE api/users/1
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Administrator")]
         public IActionResult Delete(int id)
         {
             User _userDb = _userRepository.GetSingle(id);

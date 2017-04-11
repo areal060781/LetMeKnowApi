@@ -13,20 +13,25 @@ using LetMeKnowApi.ViewModels;
 using LetMeKnowApi.Data.Abstract;
 using LetMeKnowApi.Model;
 using LetMeKnowApi.Core;
+using System.Collections.Generic;
+using System.Linq;
+using AutoMapper;
 
 namespace LetMeKnowApi.Controllers
 {
     //[Route("api/[controller]")]
     public class AccountsController : Controller
     {
-        private IUserRepository _userRepository;              
+        private IUserRepository _userRepository; 
+        private IRoleRepository _roleRepository;             
         private readonly JwtIssuerOptions _jwtOptions;        
         private readonly JsonSerializerSettings _serializerSettings;
-        private readonly ILogger _logger;
+        private readonly ILogger _logger;        
 
         public AccountsController(IOptions<JwtIssuerOptions> jwtOptions, 
                                     ILoggerFactory loggerFactory,
-                                    IUserRepository userRepository                                    
+                                    IUserRepository userRepository,
+                                    IRoleRepository roleRepository                                
                                     )
         {
             _jwtOptions = jwtOptions.Value;
@@ -39,46 +44,53 @@ namespace LetMeKnowApi.Controllers
                 Formatting = Formatting.Indented
             };
 
-            _userRepository = userRepository;             
-        }        
+            _userRepository = userRepository;     
+            _roleRepository = roleRepository;        
+        }    
 
         [HttpPost]
         [AllowAnonymous]
         [Route("signin")]
         public async Task<IActionResult> Login([FromForm] LoginViewModel user)
-        {
+        {            
             if (!ModelState.IsValid)
             {                            
                 return BadRequest(ModelState);
             }
 
-            User _userDb = _userRepository.GetSingle(u => u.UserName == user.UserName);   
+            User _userDb = _userRepository.GetSingle(u => u.UserName == user.UserName, u => u.Roles);   
 
             if (_userDb == null)
             {
+                _logger.LogInformation($"Nombre de usuario ({user.UserName}) o contraseña ({user.Password}) inválidos");
                 return NotFound();
             }  
             
             string passwordHashed = Extensions.EncryptPassword(user.Password, _userDb.Salt);
             if (_userDb.PasswordHash != passwordHashed){
-                return BadRequest("Las contraseñas n");            
+                _logger.LogInformation("La contraseña proporcionada es incorrecta");
+                return BadRequest("Credenciales inválidas");                          
+            }
+              
+            Role _roleDb = null;
+            foreach(var role in _userDb.Roles)
+            {
+                _roleDb = _roleRepository.GetSingle(r => r.Id == role.RoleId);                
             }
 
-            // get the user's role and give to GetClaimsIdentity as argument
-            
-            var identity = await GetClaimsIdentity(user);
-            if (identity == null)
-            {
-                _logger.LogInformation($"Nombre de usuario ({user.UserName}) o contraseña ({user.Password}) inválidos");
+            if (_roleDb == null)
+            {                
+                _logger.LogInformation($"El usuario ({user.UserName}) no tiene un rol asignado");
                 return BadRequest("Credenciales inválidas");
-            }
+            }        
 
             var claims = new[]
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
+                new Claim(JwtRegisteredClaimNames.Sub, (_userDb.Id).ToString()),
                 new Claim(JwtRegisteredClaimNames.Jti, await _jwtOptions.JtiGenerator()),
-                new Claim(JwtRegisteredClaimNames.Iat, ToUnixEpochDate(_jwtOptions.IssuedAt).ToString(), ClaimValueTypes.Integer64),
-                identity.FindFirst("DisneyCharacter")
+                new Claim(JwtRegisteredClaimNames.Iat, ToUnixEpochDate(_jwtOptions.IssuedAt).ToString(), ClaimValueTypes.Integer64), 
+                new Claim(ClaimTypes.Role, _roleDb.Name),  
+                new Claim(ClaimTypes.Name, _userDb.UserName)
             };
 
             // Create the JWT security token and encode it.
@@ -100,8 +112,8 @@ namespace LetMeKnowApi.Controllers
             };
 
             var json = JsonConvert.SerializeObject(response, _serializerSettings);
-            return new OkObjectResult(json);
-        }
+            return new OkObjectResult(json);              
+        }        
 
         private static void ThrowIfInvalidOptions(JwtIssuerOptions options)
         {
@@ -127,32 +139,62 @@ namespace LetMeKnowApi.Controllers
         private static long ToUnixEpochDate(DateTime date)
         => (long)Math.Round((date.ToUniversalTime() - new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero)).TotalSeconds);
 
-        /// <summary>
-        /// IMAGINE BIG RED WARNING SIGNS HERE!
-        /// You'd want to retrieve claims through your claims provider
-        /// in whatever way suits you, the below is purely for demo purposes!
-        /// </summary>
-        private static Task<ClaimsIdentity> GetClaimsIdentity(LoginViewModel user)
-        {                    
-            if (user.UserName == "MickeyMouse" &&
-                user.Password == "MickeyMouseIsBoss123")
+        private bool UserNameExists(string userName, int? id)
+        {                  
+            if (id != null){
+                return (_userRepository.GetSingle(u => u.UserName == userName, u => u.Id != id) != null) ? true : false;
+            }
+            else
             {
-                return Task.FromResult(new ClaimsIdentity(new GenericIdentity(user.UserName, "Token"),
-                new[]
-                {
-                    new Claim("DisneyCharacter", "IAmMickey")
-                }));
+                return (_userRepository.GetSingle(u => u.UserName == userName) != null) ? true : false;
+            }                                  
+        }
+
+
+        // POST api/users 
+        [HttpPost]
+        [AllowAnonymous]
+        [Route("signup")]
+        public IActionResult Create([FromBody]RegisterViewModel user)
+        {
+
+            if (!ModelState.IsValid)
+            {                            
+                return BadRequest(ModelState);
+            }
+            
+            if (UserNameExists(user.UserName, null))
+            {
+                var message = new[] {"El nombre de usuario ya ha sido tomado"};
+                var response = new { userName = message };                    
+                return BadRequest(response);                    
             }
 
-            if (user.UserName == "NotMickeyMouse" &&
-                user.Password == "NotMickeyMouseIsBoss123")
-            {
-                return Task.FromResult(new ClaimsIdentity(new GenericIdentity(user.UserName, "Token"),
-                new Claim[] { }));
-            }
+            string salt = Extensions.CreateSalt();
+            string password = Extensions.EncryptPassword(user.Password, salt);  
+            int defaultRole = 2;          
 
-            // Credentials are invalid, or account doesn't exist
-            return Task.FromResult<ClaimsIdentity>(null);
-        }    
+            User _newUser = new User 
+            { 
+                UserName = user.UserName, 
+                PasswordHash = password, 
+                Salt = salt, 
+                Email = user.Email
+            };
+
+            _newUser.Roles.Add(new UserRole
+            {
+                User = _newUser,
+                RoleId = defaultRole
+            });
+
+            _userRepository.Add(_newUser);
+            _userRepository.Commit();
+            
+            UserViewModel _userVM = Mapper.Map<User, UserViewModel>(_newUser);  
+            
+            CreatedAtRouteResult result = CreatedAtRoute("GetUser", new { controller = "Users", id = _newUser.Id }, _userVM);
+            return result;            
+        }       
     }
 }

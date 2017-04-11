@@ -18,6 +18,7 @@ using LetMeKnowApi.Data.Abstract;
 using LetMeKnowApi.Data.Repositories;
 using LetMeKnowApi.ViewModels.Mappings;
 using LetMeKnowApi.Core;
+using System.Reflection;
 
 namespace LetMeKnowApi
 {
@@ -29,6 +30,7 @@ namespace LetMeKnowApi
         public IConfigurationRoot Configuration { get; }
         private const string SecretKey = "needtogetthisfromenvironment";
         private readonly SymmetricSecurityKey _signingKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(SecretKey));
+        
         public Startup(IHostingEnvironment env)
         {        
             _applicationPath = env.WebRootPath;
@@ -44,7 +46,7 @@ namespace LetMeKnowApi
             {
                 // This reads the configuration keys from the secret store.
                 // For more details on using the user secret store see http://go.microsoft.com/fwlink/?LinkID=532709
-                builder.AddUserSecrets();
+                builder.AddUserSecrets();                
             }
 
             Configuration = builder.Build();
@@ -52,7 +54,8 @@ namespace LetMeKnowApi
 
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
-        {        
+        {                   
+
             string sqlConnectionString = Configuration.GetConnectionString("DefaultConnection");
 
             try
@@ -103,9 +106,8 @@ namespace LetMeKnowApi
 
             // Use policy auth.
             services.AddAuthorization(options =>
-            {
-                options.AddPolicy("DisneyUser",
-                                policy => policy.RequireClaim("DisneyCharacter", "IAmMickey"));
+            {                            
+                options.AddPolicy("ValidRoles", policy => policy.RequireRole("Administrator","Sender"));                
             });
 
             // Get options from app settings
