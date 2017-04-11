@@ -2,7 +2,7 @@
 
 ## This application consists of:
 
-*   Sample pages using ASP.NET Core MVC, JWT Bearer and authorization
+*  Sample pages using ASP.NET Core MVC, Json Web Token and Bearer authorization
 * ASP.NET Core
 * Entity Framework Core
 * Entity Framework Migrations - Code First
